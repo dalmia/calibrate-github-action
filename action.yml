@@ -1,0 +1,64 @@
+name: "Calibrate Agent Tests"
+description: "Run Calibrate agent tests in CI — gate the build on failures or just report the numbers, and auto-comment on PRs."
+author: "Calibrate"
+branding:
+  icon: "check-circle"
+  color: "purple"
+
+inputs:
+  api-key:
+    description: "Calibrate API key (sk_…). Store as a secret, e.g. secrets.CALIBRATE_API_KEY."
+    required: true
+  agents:
+    description: "Comma-separated agent UUIDs to run all linked tests for."
+    required: true
+  base-url:
+    description: "Base URL of the Calibrate backend API (e.g. https://api.calibrate.example)."
+    required: true
+  app-url:
+    description: "Base URL of the Calibrate web UI, used to link runs in the PR comment/summary. Optional."
+    required: false
+    default: ""
+  mode:
+    description: "'gate' fails the job if any test fails; 'report' always succeeds and only prints the numbers."
+    required: false
+    default: "gate"
+  poll-interval:
+    description: "Seconds between status polls."
+    required: false
+    default: "5"
+  timeout:
+    description: "Max seconds to wait for all runs to finish before giving up."
+    required: false
+    default: "1800"
+  github-token:
+    description: "Token used to post the PR comment. Defaults to the workflow token; needs pull-requests: write."
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  total:
+    description: "Total number of test cases across all agents."
+    value: ${{ steps.calibrate.outputs.total }}
+  passed:
+    description: "Total passed test cases."
+    value: ${{ steps.calibrate.outputs.passed }}
+  failed:
+    description: "Total failed test cases."
+    value: ${{ steps.calibrate.outputs.failed }}
+
+runs:
+  using: "composite"
+  steps:
+    - id: calibrate
+      shell: bash
+      env:
+        CALIBRATE_API_KEY: ${{ inputs.api-key }}
+        CALIBRATE_AGENTS: ${{ inputs.agents }}
+        CALIBRATE_BASE_URL: ${{ inputs.base-url }}
+        CALIBRATE_APP_URL: ${{ inputs.app-url }}
+        CALIBRATE_MODE: ${{ inputs.mode }}
+        CALIBRATE_POLL_INTERVAL: ${{ inputs.poll-interval }}
+        CALIBRATE_TIMEOUT: ${{ inputs.timeout }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: ${{ github.action_path }}/run.sh
