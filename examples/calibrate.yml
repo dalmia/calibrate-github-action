@@ -1,12 +1,12 @@
 # Example workflow for consumers — copy into their repo at
-# .github/workflows/calibrate.yml and adjust the agent UUIDs / URLs.
+# .github/workflows/calibrate.yml and adjust the agent names.
 name: Calibrate
 
 on:
   pull_request:
   push:
     branches: [main]
-  workflow_dispatch:   # lets you trigger a run by hand from the Actions tab
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -19,7 +19,7 @@ jobs:
       - uses: artpark/calibrate-github-action@v1
         with:
           api-key: ${{ secrets.CALIBRATE_API_KEY }}
-          base-url: https://api.calibrate.example
-          app-url: https://app.calibrate.example
-          agents: REPLACE_WITH_AGENT_UUID_1,REPLACE_WITH_AGENT_UUID_2
+          agents: my-first-agent, my-second-agent   # agent names
           mode: gate
+          # base-url: optional — defaults to the hosted Calibrate backend. Override only for self-hosted.
+          # app-url:  optional — web UI base; adds "view" links to the PR comment.

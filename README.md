@@ -1,40 +1,40 @@
-# Calibrate Agent Tests — GitHub Action
+# Calibrate GitHub Action
 
-Run [Calibrate](https://calibrate.example) agent tests from CI. Trigger all tests
-linked to one or more agents, wait for them to finish, and either **gate** the
-build on failures or just **report** the numbers. On pull requests it
-auto-posts a per-agent summary comment (Codecov-style — one comment, updated in
-place).
+This action runs your [Calibrate](https://calibrate.artpark.ai) agent tests
+automatically in GitHub.
 
-It talks only to the Calibrate REST API using an **API key**, so there's nothing
-to install on the runner beyond `curl` and `jq` (both present on
-`ubuntu-latest`).
+You give it one or more agents. It runs all the tests attached to those agents,
+waits for them to finish, and reports the results.
 
-> This is a composite action (a single `run.sh` driving the Calibrate REST API).
-> Pin it by tag: `artpark/calibrate-github-action@v1`.
+You can choose what happens when a test fails:
+
+- **gate** (default) — the check fails, so a broken agent can block a merge.
+- **report** — the check always passes; it just shows the numbers.
+
+If the run is on a pull request, it also adds a comment to the PR with the
+results. Re-running updates that same comment instead of adding a new one.
 
 ## Setup
 
-1. **Create an API key** in Calibrate: `POST /api-keys` (or the UI), scoped to
-   the workspace/org that owns your agents. The raw `sk_…` key is shown
-   **once** — copy it.
-2. **Add it as a repo secret**, e.g. `CALIBRATE_API_KEY`.
-3. **Add a workflow** (below). Grant `pull-requests: write` if you want the PR
-   comment.
+1. Create an API key in the Calibrate UI.
+2. In your GitHub repo, save it as a secret named `CALIBRATE_API_KEY`
+   (Settings → Secrets and variables → Actions).
+3. Add the workflow file below to your repo.
+
+The workflow includes a `permissions` block that lets the action post its
+results as a comment on your pull requests. Keep it if you want the PR comment;
+remove it if you don't.
 
 ## Usage
 
 ```yaml
 # .github/workflows/calibrate.yml
 name: Calibrate
-on:
-  pull_request:
-  push:
-    branches: [main]
+on: [pull_request]
 
 permissions:
   contents: read
-  pull-requests: write   # needed only for the PR comment
+  pull-requests: write   # for the PR comment
 
 jobs:
   agent-tests:
@@ -43,10 +43,15 @@ jobs:
       - uses: artpark/calibrate-github-action@v1
         with:
           api-key: ${{ secrets.CALIBRATE_API_KEY }}
-          base-url: https://api.calibrate.example
-          app-url: https://app.calibrate.example   # optional, for report links
-          agents: 7f3c…,9a21…                       # one or more agent UUIDs
-          mode: gate                                # gate | report
+          agents: checkout-bot, support-agent
+```
+
+You can also list agents one per line:
+
+```yaml
+          agents: |
+            checkout-bot
+            support-agent
 ```
 
 ## Inputs
@@ -54,30 +59,13 @@ jobs:
 | Input          | Required | Default            | Description |
 |----------------|----------|--------------------|-------------|
 | `api-key`      | yes      | —                  | `sk_…` key. Use a secret. |
-| `agents`       | yes      | —                  | Comma-separated agent UUIDs. Runs **all** tests linked to each. |
-| `base-url`     | yes      | —                  | Calibrate backend API base URL. |
-| `app-url`      | no       | `""`               | Web UI base URL; turns run IDs into `view` links in the report. |
-| `mode`         | no       | `gate`             | `gate` fails the job on any test failure; `report` always succeeds. |
+| `agents`       | yes      | —                  | Agent names, separated by commas or newlines. Runs **all** tests linked to each. |
+| `base-url`     | no       | `https://pense-backend.artpark.ai` | Backend API. Override only for self-hosted. |
+| `app-url`      | no       | `https://calibrate.artpark.ai` | Web UI base for `view` links in the report. |
+| `mode`         | no       | `gate`             | `gate` fails the job on any failure; `report` always succeeds. |
 | `poll-interval`| no       | `5`                | Seconds between status polls. |
-| `timeout`      | no       | `1800`             | Max seconds to wait for all runs to finish. |
-| `github-token` | no       | `${{ github.token }}` | Token for the PR comment; needs `pull-requests: write`. |
+| `timeout`      | no       | `1800`             | Max seconds to wait for runs to finish. |
 
 ## Outputs
 
-| Output   | Description |
-|----------|-------------|
-| `total`  | Total test cases across all agents. |
-| `passed` | Total passed. |
-| `failed` | Total failed. |
-
-## Behavior notes
-
-- **`gate` vs `report`** — `gate` exits non-zero (red ❌ check) if any test
-  fails, any run errors/times out, or an agent fails to start. `report` runs the
-  same and prints the numbers but always exits 0.
-- **PR comment** — posted automatically on `pull_request` events (no flag).
-  It's found-or-updated via a hidden marker, so re-runs edit the same comment.
-- **Scoping** — the API key is bound to one org; agents outside it return 404
-  (the action reports them as "not started", which fails `gate` mode).
-- **Auth header** — the key works as `Authorization: Bearer sk_…` or
-  `X-API-Key: sk_…`; this action uses the latter.
+`total`, `passed`, `failed` — test-case counts across all agents.

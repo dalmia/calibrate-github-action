@@ -50,32 +50,109 @@ api() {
   API_BODY="$(cat "$_BODY_FILE")"
 }
 
-# Split comma-separated agents, trim whitespace, drop blanks.
-IFS=',' read -ra _agents <<<"$AGENTS_RAW"
-AGENTS=()
-for a in "${_agents[@]}"; do
-  a="$(echo "$a" | xargs)"
-  [[ -n "$a" ]] && AGENTS+=("$a")
+# Split agent names on commas OR newlines (supports both "a,b,c" and the multiline
+# YAML block form), trim whitespace, drop blanks. Each token is an agent name,
+# kept as-is for display.
+IFS=$',\n' read -ra _tokens <<<"$AGENTS_RAW"
+LABELS=()
+for t in "${_tokens[@]}"; do
+  t="$(echo "$t" | xargs)"
+  [[ -n "$t" ]] && LABELS+=("$t")
 done
-[[ ${#AGENTS[@]} -gt 0 ]] || { echo "::error::no agent UUIDs provided"; exit 2; }
+[[ ${#LABELS[@]} -gt 0 ]] || { echo "::error::no agents provided"; exit 2; }
 
-# Parallel arrays indexed alongside AGENTS.
-N=${#AGENTS[@]}
-TASK=(); STATUS=(); TOTAL=(); PASSED=(); FAILED=()
+# Parallel arrays indexed alongside LABELS. AGENTS holds the resolved UUID used
+# for API calls; LABELS holds the agent name, used in logs and the report.
+N=${#LABELS[@]}
+AGENTS=(); TASK=(); STATUS=(); TOTAL=(); PASSED=(); FAILED=()
 for ((i = 0; i < N; i++)); do
-  TASK[i]=""; STATUS[i]="not-started"; TOTAL[i]=0; PASSED[i]=0; FAILED[i]=0
+  AGENTS[i]=""; TASK[i]=""; STATUS[i]="not-started"; TOTAL[i]=0; PASSED[i]=0; FAILED[i]=0
 done
 
+# Resolve agent names to UUIDs in a single batch call. Names are scoped to the
+# caller's org by the API key, so a name maps to at most one agent.
+#
+#   Resolve API:  POST /agents/resolve   {"names": ["alpha", ...]}
+#     200 -> {"resolved": {"alpha": "<uuid>", ...}, "not_found": ["missing", ...]}
+echo "::group::Resolving agents"
+names_json="$(printf '%s\n' "${LABELS[@]}" | jq -R . | jq -s '{names: .}')"
+api POST "/agents/resolve" "$names_json"
+case "$API_HTTP_STATUS" in
+  200) ;;
+  401 | 403)
+    echo "::error::authentication failed (HTTP ${API_HTTP_STATUS}) resolving agent names"
+    echo "::error::check the api-key input — set it to a valid Calibrate key via the CALIBRATE_API_KEY secret."
+    echo "::endgroup::"
+    exit 2
+    ;;
+  *)
+    detail="$(echo "$API_BODY" | jq -r '.detail // empty' 2>/dev/null)"
+    [[ -z "$detail" ]] && detail="$API_BODY"
+    echo "::error::failed to resolve agent names (HTTP ${API_HTTP_STATUS}): ${detail}"
+    echo "::endgroup::"
+    exit 2
+    ;;
+esac
+
+# Map each name to its UUID from the "resolved" object; collect any misses.
+UNRESOLVED=()
+for ((i = 0; i < N; i++)); do
+  AGENTS[i]="$(echo "$API_BODY" | jq -r --arg n "${LABELS[i]}" '.resolved[$n] // empty')"
+  if [[ -n "${AGENTS[i]}" ]]; then
+    echo "agent \"${LABELS[i]}\" -> ${AGENTS[i]}"
+  else
+    echo "::error::agent \"${LABELS[i]}\": no agent with that name in this org."
+    UNRESOLVED+=("${LABELS[i]}")
+  fi
+done
+
+# Fail fast: if any name didn't resolve, stop before triggering any runs.
+if [[ ${#UNRESOLVED[@]} -gt 0 ]]; then
+  echo "::error::${#UNRESOLVED[@]} agent name(s) could not be resolved: ${UNRESOLVED[*]}"
+  echo "::endgroup::"
+  exit 2
+fi
+echo "::endgroup::"
+
+# Triggering a run also validates the agent: the API returns distinct codes for
+# bad auth (401/403), missing agent (404), and unrunnable agent (400, e.g.
+# connection not verified or no linked tests). 401/403 are global — the key is
+# bad, so every agent fails the same way — so we stop immediately. 404/400 are
+# per-agent: report and keep going so one bad agent doesn't hide the rest.
 echo "::group::Triggering runs"
 for ((i = 0; i < N; i++)); do
-  agent="${AGENTS[i]}"
+  agent="${AGENTS[i]}"; label="${LABELS[i]}"
+  [[ -z "$agent" ]] && continue   # unresolved name; already reported above
+
   api POST "/agent-tests/agent/${agent}/run" '{}'
-  if [[ "$API_HTTP_STATUS" != "200" && "$API_HTTP_STATUS" != "201" ]]; then
-    echo "::error::failed to start run for agent ${agent} (HTTP ${API_HTTP_STATUS}): $(echo "$API_BODY" | jq -r '.detail // .' 2>/dev/null || echo "$API_BODY")"
+
+  if [[ "$API_HTTP_STATUS" == "200" || "$API_HTTP_STATUS" == "201" ]]; then
+    TASK[i]="$(echo "$API_BODY" | jq -r '.task_id')"
+    echo "agent ${label} -> run ${TASK[i]}"
     continue
   fi
-  TASK[i]="$(echo "$API_BODY" | jq -r '.task_id')"
-  echo "agent ${agent} -> run ${TASK[i]}"
+
+  # API error message (FastAPI-style {"detail": "..."}), falling back to raw body.
+  detail="$(echo "$API_BODY" | jq -r '.detail // empty' 2>/dev/null)"
+  [[ -z "$detail" ]] && detail="$API_BODY"
+
+  case "$API_HTTP_STATUS" in
+    401 | 403)
+      echo "::error::authentication failed (HTTP ${API_HTTP_STATUS}): ${detail}"
+      echo "::error::check the api-key input — set it to a valid Calibrate key via the CALIBRATE_API_KEY secret."
+      echo "::endgroup::"
+      exit 2
+      ;;
+    404)
+      echo "::error::agent ${label}: not found (HTTP 404) — the agent may have been deleted, or belongs to a different org than this API key."
+      ;;
+    400)
+      echo "::error::agent ${label}: cannot run (HTTP 400): ${detail}"
+      ;;
+    *)
+      echo "::error::agent ${label}: failed to start (HTTP ${API_HTTP_STATUS}): ${detail}"
+      ;;
+  esac
 done
 echo "::endgroup::"
 
@@ -102,7 +179,7 @@ while :; do
       TOTAL[i]="$(echo "$API_BODY" | jq -r '.total_tests // 0')"
       PASSED[i]="$(echo "$API_BODY" | jq -r '.passed // 0')"
       FAILED[i]="$(echo "$API_BODY" | jq -r '.failed // 0')"
-      echo "agent ${AGENTS[i]}: ${st} (${PASSED[i]}/${TOTAL[i]} passed)"
+      echo "agent ${LABELS[i]}: ${st} (${PASSED[i]}/${TOTAL[i]} passed)"
     else
       pending=1
     fi
@@ -120,9 +197,9 @@ echo "::endgroup::"
 SUM_TOTAL=0; SUM_PASSED=0; SUM_FAILED=0; ANY_PROBLEM=0
 ROWS=""
 for ((i = 0; i < N; i++)); do
-  agent="${AGENTS[i]}"; tid="${TASK[i]}"; st="${STATUS[i]}"
+  label="${LABELS[i]}"; tid="${TASK[i]}"; st="${STATUS[i]}"
   if [[ -z "$tid" ]]; then
-    ROWS+="| \`${agent}\` | — | ⚠️ not started |\n"
+    ROWS+="| \`${label}\` | — | ⚠️ not started |\n"
     ANY_PROBLEM=1
     continue
   fi
@@ -132,12 +209,12 @@ for ((i = 0; i < N; i++)); do
   [[ -n "$APP_URL" ]] && link="[view](${APP_URL}/agent-tests/run/${tid})"
   if [[ "$st" != "done" ]]; then
     ANY_PROBLEM=1
-    ROWS+="| \`${agent}\` | ${p}/${t} | ⚠️ ${st} ${link} |\n"
+    ROWS+="| \`${label}\` | ${p}/${t} | ⚠️ ${st} ${link} |\n"
   elif [[ "$f" -gt 0 ]]; then
     ANY_PROBLEM=1
-    ROWS+="| \`${agent}\` | ${p}/${t} | ❌ ${f} failed ${link} |\n"
+    ROWS+="| \`${label}\` | ${p}/${t} | ❌ ${f} failed ${link} |\n"
   else
-    ROWS+="| \`${agent}\` | ${p}/${t} | ✅ pass ${link} |\n"
+    ROWS+="| \`${label}\` | ${p}/${t} | ✅ pass ${link} |\n"
   fi
 done
 

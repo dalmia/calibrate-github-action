@@ -1,4 +1,4 @@
-name: "Calibrate Agent Tests"
+name: "Calibrate"
 description: "Run Calibrate agent tests in CI — gate the build on failures or just report the numbers, and auto-comment on PRs."
 author: "Calibrate"
 branding:
@@ -10,15 +10,16 @@ inputs:
     description: "Calibrate API key (sk_…). Store as a secret, e.g. secrets.CALIBRATE_API_KEY."
     required: true
   agents:
-    description: "Comma-separated agent UUIDs to run all linked tests for."
+    description: "Agent names to run all linked tests for, separated by commas or newlines."
     required: true
   base-url:
-    description: "Base URL of the Calibrate backend API (e.g. https://api.calibrate.example)."
-    required: true
-  app-url:
-    description: "Base URL of the Calibrate web UI, used to link runs in the PR comment/summary. Optional."
+    description: "Base URL of the Calibrate backend API. Optional — defaults to the hosted Calibrate backend."
     required: false
-    default: ""
+    default: "https://pense-backend.artpark.ai"
+  app-url:
+    description: "Base URL of the Calibrate web UI, used to link runs in the PR comment/summary. Optional — defaults to the hosted Calibrate web UI."
+    required: false
+    default: "https://calibrate.artpark.ai"
   mode:
     description: "'gate' fails the job if any test fails; 'report' always succeeds and only prints the numbers."
     required: false
