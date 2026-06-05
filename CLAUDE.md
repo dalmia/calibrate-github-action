@@ -12,7 +12,7 @@ pull requests it posts/updates a single summary comment.
 
 There is no build step and no compiled code — the action is a single bash script
 driving the Calibrate REST API with `curl` + `jq`. "Releasing" is just pushing a
-git tag (e.g. `v1`); consumers reference it as `artpark/calibrate-github-action@v1`.
+git tag (e.g. `v1`); consumers reference it as `dalmia/calibrate-github-action@v1`.
 
 ## Files
 
@@ -55,16 +55,16 @@ Status-code conventions the script relies on: **401/403** = bad/missing key
 
 ## Inputs (defined in `action.yml`)
 
-| Input | Required | Default | Notes |
-|---|---|---|---|
-| `api-key` | yes | — | `sk_…`; pass via a repo secret. |
-| `agents` | yes | — | Agent **names** (not UUIDs), comma- or newline-separated. |
-| `base-url` | no | `https://pense-backend.artpark.ai` | Backend API; override only for self-hosted. |
-| `app-url` | no | `https://calibrate.artpark.ai` | Web UI base for `view` links in the report. |
-| `mode` | no | `gate` | `gate` fails on any problem; `report` always exits 0. |
-| `poll-interval` | no | `5` | Seconds between status polls. |
-| `timeout` | no | `1800` | Max seconds to wait for runs. |
-| `github-token` | no | `${{ github.token }}` | For the PR comment; needs `pull-requests: write`. Not surfaced in README. |
+| Input           | Required | Default                            | Notes                                                                     |
+| --------------- | -------- | ---------------------------------- | ------------------------------------------------------------------------- |
+| `api-key`       | yes      | —                                  | `sk_…`; pass via a repo secret.                                           |
+| `agents`        | yes      | —                                  | Agent **names** (not UUIDs), comma- or newline-separated.                 |
+| `base-url`      | no       | `https://pense-backend.artpark.ai` | Backend API; override only for self-hosted.                               |
+| `app-url`       | no       | `https://calibrate.artpark.ai`     | Web UI base for `view` links in the report.                               |
+| `mode`          | no       | `gate`                             | `gate` fails on any problem; `report` always exits 0.                     |
+| `poll-interval` | no       | `5`                                | Seconds between status polls.                                             |
+| `timeout`       | no       | `1800`                             | Max seconds to wait for runs.                                             |
+| `github-token`  | no       | `${{ github.token }}`              | For the PR comment; needs `pull-requests: write`. Not surfaced in README. |
 
 ## run.sh conventions (read before editing)
 

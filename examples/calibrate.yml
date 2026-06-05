@@ -10,16 +10,16 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write   # required for the auto PR comment
+  pull-requests: write # required for the auto PR comment
 
 jobs:
   agent-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: artpark/calibrate-github-action@v1
+      - uses: dalmia/calibrate-github-action@v1
         with:
           api-key: ${{ secrets.CALIBRATE_API_KEY }}
-          agents: my-first-agent, my-second-agent   # agent names
+          agents: my-first-agent, my-second-agent # agent names
           mode: gate
           # base-url: optional — defaults to the hosted Calibrate backend. Override only for self-hosted.
           # app-url:  optional — web UI base; adds "view" links to the PR comment.

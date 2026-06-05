@@ -34,13 +34,13 @@ on: [pull_request]
 
 permissions:
   contents: read
-  pull-requests: write   # for the PR comment
+  pull-requests: write # for the PR comment
 
 jobs:
   agent-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: artpark/calibrate-github-action@v1
+      - uses: dalmia/calibrate-github-action@v1
         with:
           api-key: ${{ secrets.CALIBRATE_API_KEY }}
           agents: checkout-bot, support-agent
@@ -49,22 +49,22 @@ jobs:
 You can also list agents one per line:
 
 ```yaml
-          agents: |
-            checkout-bot
-            support-agent
+agents: |
+  checkout-bot
+  support-agent
 ```
 
 ## Inputs
 
-| Input          | Required | Default            | Description |
-|----------------|----------|--------------------|-------------|
-| `api-key`      | yes      | —                  | `sk_…` key. Use a secret. |
-| `agents`       | yes      | —                  | Agent names, separated by commas or newlines. Runs **all** tests linked to each. |
-| `base-url`     | no       | `https://pense-backend.artpark.ai` | Backend API. Override only for self-hosted. |
-| `app-url`      | no       | `https://calibrate.artpark.ai` | Web UI base for `view` links in the report. |
-| `mode`         | no       | `gate`             | `gate` fails the job on any failure; `report` always succeeds. |
-| `poll-interval`| no       | `5`                | Seconds between status polls. |
-| `timeout`      | no       | `1800`             | Max seconds to wait for runs to finish. |
+| Input           | Required | Default                            | Description                                                                      |
+| --------------- | -------- | ---------------------------------- | -------------------------------------------------------------------------------- |
+| `api-key`       | yes      | —                                  | `sk_…` key. Use a secret.                                                        |
+| `agents`        | yes      | —                                  | Agent names, separated by commas or newlines. Runs **all** tests linked to each. |
+| `base-url`      | no       | `https://pense-backend.artpark.ai` | Backend API. Override only for self-hosted.                                      |
+| `app-url`       | no       | `https://calibrate.artpark.ai`     | Web UI base for `view` links in the report.                                      |
+| `mode`          | no       | `gate`                             | `gate` fails the job on any failure; `report` always succeeds.                   |
+| `poll-interval` | no       | `5`                                | Seconds between status polls.                                                    |
+| `timeout`       | no       | `1800`                             | Max seconds to wait for runs to finish.                                          |
 
 ## Outputs
 
