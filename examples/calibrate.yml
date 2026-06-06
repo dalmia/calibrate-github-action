@@ -19,7 +19,7 @@ jobs:
       - uses: ARTPARK-SAHAI-ORG/calibrate-github-action@v1
         with:
           api-key: ${{ secrets.CALIBRATE_API_KEY }}
-          agents: my-first-agent, my-second-agent # agent names
+          agents: my-first-agent, my-second-agent # agent names; omit to run every agent on the API key
           mode: gate
           # base-url: optional — defaults to the hosted Calibrate backend. Override only for self-hosted.
           # app-url:  optional — web UI base; adds "view" links to the PR comment.

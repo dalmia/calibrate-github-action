@@ -10,8 +10,8 @@ inputs:
     description: "Calibrate API key (sk_…). Store as a secret, e.g. secrets.CALIBRATE_API_KEY."
     required: true
   agents:
-    description: "Agent names to run all linked tests for, separated by commas or newlines."
-    required: true
+    description: "Agent names to run all linked tests for, separated by commas or newlines. Optional — if omitted, every agent for the API key is run."
+    required: false
   base-url:
     description: "Base URL of the Calibrate backend API. Optional — defaults to the hosted Calibrate backend."
     required: false

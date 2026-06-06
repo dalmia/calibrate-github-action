@@ -4,7 +4,8 @@ This action runs your [Calibrate](https://calibrate.artpark.ai) agent tests
 automatically in GitHub.
 
 You give it one or more agents. It runs all the tests attached to those agents,
-waits for them to finish, and reports the results.
+waits for them to finish, and reports the results. Leave the agent list out and
+it runs the tests for every agent on your API key.
 
 You can choose what happens when a test fails:
 
@@ -54,12 +55,20 @@ agents: |
   support-agent
 ```
 
+Or omit `agents` to run every agent on your API key:
+
+```yaml
+- uses: ARTPARK-SAHAI-ORG/calibrate-github-action@v1
+  with:
+    api-key: ${{ secrets.CALIBRATE_API_KEY }}
+```
+
 ## Inputs
 
 | Input           | Required | Default                            | Description                                                                      |
 | --------------- | -------- | ---------------------------------- | -------------------------------------------------------------------------------- |
 | `api-key`       | yes      | —                                  | `sk_…` key. Use a secret.                                                        |
-| `agents`        | yes      | —                                  | Agent names, separated by commas or newlines. Runs **all** tests linked to each. |
+| `agents`        | no       | _all agents_                       | Agent names, separated by commas or newlines. Runs **all** tests linked to each. Omit to run every agent on the API key. |
 | `base-url`      | no       | `https://pense-backend.artpark.ai` | Backend API. Override only for self-hosted.                                      |
 | `app-url`       | no       | `https://calibrate.artpark.ai`     | Web UI base for `view` links in the report.                                      |
 | `mode`          | no       | `gate`                             | `gate` fails the job on any failure; `report` always succeeds.                   |

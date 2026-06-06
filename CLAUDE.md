@@ -43,6 +43,9 @@ defaults in **one** place — `action.yml` is the source of truth for default UR
 - `POST /agents/resolve` — body `{"names": [...]}`, returns
   `{"resolved": {name: uuid}, "not_found": [...]}`. Org-scoped by the API key;
   names are unique per org. Used to turn agent names into UUIDs.
+- `GET /agents` — lists every agent for the API key as
+  `[{"name": ..., "id": ...}, ...]` (or `{"agents": [...]}`). Used when the
+  `agents` input is omitted; both name and UUID come back so no resolve is needed.
 - `POST /agent-tests/agent/{uuid}/run` — triggers all tests linked to the agent;
   returns `{"task_id": ...}`.
 - `GET /agent-tests/run/{task_id}` — run status; terminal states are `done`,
@@ -58,7 +61,7 @@ Status-code conventions the script relies on: **401/403** = bad/missing key
 | Input           | Required | Default                            | Notes                                                                     |
 | --------------- | -------- | ---------------------------------- | ------------------------------------------------------------------------- |
 | `api-key`       | yes      | —                                  | `sk_…`; pass via a repo secret.                                           |
-| `agents`        | yes      | —                                  | Agent **names** (not UUIDs), comma- or newline-separated.                 |
+| `agents`        | no       | _all agents_                       | Agent **names** (not UUIDs), comma- or newline-separated. Omit to run every agent on the key (via `GET /agents`). |
 | `base-url`      | no       | `https://pense-backend.artpark.ai` | Backend API; override only for self-hosted.                               |
 | `app-url`       | no       | `https://calibrate.artpark.ai`     | Web UI base for `view` links in the report.                               |
 | `mode`          | no       | `gate`                             | `gate` fails on any problem; `report` always exits 0.                     |
@@ -71,8 +74,13 @@ Status-code conventions the script relies on: **401/403** = bad/missing key
 - **Agents are names only.** UUID input is intentionally **not** supported — every
   token is resolved via `POST /agents/resolve`. Don't reintroduce UUID
   passthrough.
-- **Fail fast on unresolved names.** If any name doesn't resolve, the script
-  prints each miss and exits `2` **before triggering any run**. Preserve this.
+- **`agents` is optional.** Given → resolve those names (explicit mode). Omitted →
+  `GET /agents` lists every agent for the key and populates `LABELS`/`AGENTS`
+  directly (no resolve). Both modes converge on the same `LABELS`/`AGENTS` arrays,
+  so everything downstream (trigger/poll/report) is unchanged.
+- **Fail fast on unresolved names.** In explicit mode, if any name doesn't
+  resolve, the script prints each miss and exits `2` **before triggering any
+  run**. Preserve this.
 - **`LABELS` vs `AGENTS`.** Parallel indexed arrays: `LABELS[i]` is the
   user-typed agent name (used in all logs and the report); `AGENTS[i]` is the
   resolved UUID (used in API calls). Always show `LABELS` to users, never the
