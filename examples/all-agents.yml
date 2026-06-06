@@ -1,0 +1,25 @@
+# Example: run tests for every agent on the API key.
+# Copy into your repo at .github/workflows/calibrate.yml.
+# Omit the `agents` input and the action runs all agents on the key.
+name: Calibrate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write # required for the auto PR comment
+
+jobs:
+  agent-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ARTPARK-SAHAI-ORG/calibrate-github-action@v1
+        with:
+          api-key: ${{ secrets.CALIBRATE_API_KEY }}
+          mode: gate
+          # base-url: optional — defaults to the hosted Calibrate backend. Override only for self-hosted.
+          # app-url:  optional — web UI base; adds "view" links to the PR comment.

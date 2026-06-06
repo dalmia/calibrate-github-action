@@ -1,5 +1,5 @@
-# Example workflow for consumers — copy into their repo at
-# .github/workflows/calibrate.yml and adjust the agent names.
+# Example: run tests for specific agents.
+# Copy into your repo at .github/workflows/calibrate.yml and adjust the names.
 name: Calibrate
 
 on:
@@ -19,7 +19,7 @@ jobs:
       - uses: ARTPARK-SAHAI-ORG/calibrate-github-action@v1
         with:
           api-key: ${{ secrets.CALIBRATE_API_KEY }}
-          agents: my-first-agent, my-second-agent # agent names; omit to run every agent on the API key
+          agents: my-first-agent, my-second-agent # agent names
           mode: gate
           # base-url: optional — defaults to the hosted Calibrate backend. Override only for self-hosted.
           # app-url:  optional — web UI base; adds "view" links to the PR comment.

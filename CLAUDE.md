@@ -24,7 +24,9 @@ git tag (e.g. `v1`); consumers reference it as `ARTPARK-SAHAI-ORG/calibrate-gith
   code.
 - **`README.md`** — user-facing docs. Written for a **new user** in plain
   language; keep it minimal.
-- **`examples/calibrate.yml`** — a consumer workflow to copy into their repo.
+- **`examples/specific-agents.yml`** / **`examples/all-agents.yml`** — consumer
+  workflows to copy into their repo: one naming specific agents, one omitting
+  `agents` to run every agent on the key.
 
 ## How a value flows through
 
@@ -111,4 +113,4 @@ syntax-checked.
 
 `README.md` targets a **new user**: short sentences, plain language, no jargon
 dumps. When changing behavior or inputs, update `README.md`, `action.yml`, and
-`examples/calibrate.yml` together so they stay consistent.
+the `examples/*.yml` workflows together so they stay consistent.
