@@ -1,6 +1,6 @@
-# Example: run tests for every agent on the API key.
+# Example: run tests for every agent in the account linked to the API key.
 # Copy into your repo at .github/workflows/calibrate.yml.
-# Omit the `agents` input and the action runs all agents on the key.
+# Omit the `agents` input and the action runs all agents in the account linked to the API key.
 name: Calibrate
 
 on:

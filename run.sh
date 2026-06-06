@@ -119,7 +119,7 @@ if [[ ${#LABELS[@]} -gt 0 ]]; then
   fi
   echo "::endgroup::"
 else
-  # No agents given: run every agent associated with this API key. The list API
+  # No agents given: run every agent in the account linked to the API key. The list API
   # returns both the name and the UUID for each, so we populate LABELS/AGENTS
   # directly and skip the resolve step — nothing downstream changes.
   #
@@ -153,7 +153,7 @@ else
   done < <(echo "$API_BODY" | jq -r '.[] | [.name, .uuid] | @tsv')
 
   if [[ ${#LABELS[@]} -eq 0 ]]; then
-    echo "::error::no agents found for this API key — create one in Calibrate, or pass the agents input."
+    echo "::error::no agents found in the account linked to this API key — create one in Calibrate, or pass the agents input."
     echo "::endgroup::"
     exit 2
   fi

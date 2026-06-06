@@ -26,7 +26,7 @@ git tag (e.g. `v1`); consumers reference it as `ARTPARK-SAHAI-ORG/calibrate-gith
   language; keep it minimal.
 - **`examples/specific-agents.yml`** / **`examples/all-agents.yml`** — consumer
   workflows to copy into their repo: one naming specific agents, one omitting
-  `agents` to run every agent on the key.
+  `agents` to run every agent in the account linked to the API key.
 
 ## How a value flows through
 
@@ -45,7 +45,7 @@ defaults in **one** place — `action.yml` is the source of truth for default UR
 - `POST /agents/resolve` — body `{"names": [...]}`, returns
   `{"resolved": {name: uuid}, "not_found": [...]}`. Org-scoped by the API key;
   names are unique per org. Used to turn agent names into UUIDs.
-- `GET /agents` — no params; lists every agent for the API key as a bare array
+- `GET /agents` — no params; lists every agent in the account linked to the API key as a bare array
   `[{"uuid": ..., "name": ..., ...}, ...]`. Used when the `agents` input is
   omitted; both name and UUID come back so no resolve is needed. Empty org →
   `[]`; bad key → `401`.
@@ -71,7 +71,7 @@ run shouldn't turn the build red.)
 | Input           | Required | Default                            | Notes                                                                     |
 | --------------- | -------- | ---------------------------------- | ------------------------------------------------------------------------- |
 | `api-key`       | yes      | —                                  | `sk_…`; pass via a repo secret.                                           |
-| `agents`        | no       | _all agents_                       | Agent **names** (not UUIDs), comma- or newline-separated. Omit to run every agent on the key (via `GET /agents`). |
+| `agents`        | no       | _all agents_                       | Agent **names** (not UUIDs), comma- or newline-separated. Omit to run every agent in the account linked to the API key (via `GET /agents`). |
 | `base-url`      | no       | `https://pense-backend.artpark.ai` | Backend API; override only for self-hosted.                               |
 | `app-url`       | no       | `https://calibrate.artpark.ai`     | Web UI base for `view` links in the report.                               |
 | `mode`          | no       | `gate`                             | `gate` fails on any problem; `report` always exits 0.                     |

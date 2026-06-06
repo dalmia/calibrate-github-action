@@ -5,7 +5,7 @@ automatically in GitHub.
 
 You give it one or more agents. It runs all the tests attached to those agents,
 waits for them to finish, and reports the results. Leave the agent list out and
-it runs the tests for every agent on your API key.
+it runs the tests for every agent in the account linked to the API key.
 
 You can choose what happens when a test fails:
 
@@ -55,7 +55,7 @@ agents: |
   support-agent
 ```
 
-Or omit `agents` to run every agent on your API key:
+Or omit `agents` to run every agent in the account linked to the API key:
 
 ```yaml
 - uses: ARTPARK-SAHAI-ORG/calibrate-github-action@v1
@@ -68,7 +68,7 @@ Or omit `agents` to run every agent on your API key:
 | Input           | Required | Default                            | Description                                                                      |
 | --------------- | -------- | ---------------------------------- | -------------------------------------------------------------------------------- |
 | `api-key`       | yes      | —                                  | `sk_…` key. Use a secret.                                                        |
-| `agents`        | no       | _all agents_                       | Agent names, separated by commas or newlines. Runs **all** tests linked to each. Omit to run every agent on the API key. |
+| `agents`        | no       | _all agents_                       | Agent names, separated by commas or newlines. Runs **all** tests linked to each. Omit to run every agent in the account linked to the API key. |
 | `base-url`      | no       | `https://pense-backend.artpark.ai` | Backend API. Override only for self-hosted.                                      |
 | `app-url`       | no       | `https://calibrate.artpark.ai`     | Web UI base for `view` links in the report.                                      |
 | `mode`          | no       | `gate`                             | `gate` fails the job on any failure; `report` always succeeds.                   |
