@@ -12,7 +12,7 @@ pull requests it posts/updates a single summary comment.
 
 There is no build step and no compiled code — the action is a single bash script
 driving the Calibrate REST API with `curl` + `jq`. "Releasing" is just pushing a
-git tag (e.g. `v1`); consumers reference it as `dalmia/calibrate-github-action@v1`.
+git tag (e.g. `v1`); consumers reference it as `ARTPARK-SAHAI-ORG/calibrate-github-action@v1`.
 
 ## Files
 

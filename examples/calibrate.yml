@@ -16,7 +16,7 @@ jobs:
   agent-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: dalmia/calibrate-github-action@v1
+      - uses: ARTPARK-SAHAI-ORG/calibrate-github-action@v1
         with:
           api-key: ${{ secrets.CALIBRATE_API_KEY }}
           agents: my-first-agent, my-second-agent # agent names
