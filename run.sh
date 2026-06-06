@@ -119,10 +119,7 @@ else
   # directly and skip the resolve step — nothing downstream changes.
   #
   #   List API:  GET /agents
-  #     200 -> [{"uuid": "<uuid>", "name": "alpha", "type": "agent"|"connection", ...}, ...]
-  #
-  # Only type=="agent" entries are runnable; "connection" entries are external
-  # references that have no linked tests, so we skip them.
+  #     200 -> [{"uuid": "<uuid>", "name": "alpha", ...}, ...]
   echo "::group::Listing agents"
   api GET "/agents"
   case "$API_HTTP_STATUS" in
@@ -142,15 +139,15 @@ else
       ;;
   esac
 
-  # Take the name + UUID of every runnable agent (type=="agent").
+  # Take the name + UUID of every agent.
   while IFS=$'\t' read -r _nm _id; do
     [[ -n "$_nm" && -n "$_id" ]] || continue
     LABELS+=("$_nm"); AGENTS+=("$_id")
     echo "agent \"$_nm\" -> $_id"
-  done < <(echo "$API_BODY" | jq -r '.[] | select(.type == "agent") | [.name, .uuid] | @tsv')
+  done < <(echo "$API_BODY" | jq -r '.[] | [.name, .uuid] | @tsv')
 
   if [[ ${#LABELS[@]} -eq 0 ]]; then
-    echo "::error::no runnable agents found for this API key — create one in Calibrate, or pass the agents input."
+    echo "::error::no agents found for this API key — create one in Calibrate, or pass the agents input."
     echo "::endgroup::"
     exit 2
   fi
