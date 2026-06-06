@@ -128,7 +128,11 @@ for ((i = 0; i < N; i++)); do
 
   if [[ "$API_HTTP_STATUS" == "200" || "$API_HTTP_STATUS" == "201" ]]; then
     TASK[i]="$(echo "$API_BODY" | jq -r '.task_id')"
-    echo "agent ${label} -> run ${TASK[i]}"
+    if [[ -n "$APP_URL" ]]; then
+      echo "agent ${label} -> ${APP_URL}/agent-tests/run/${TASK[i]}"
+    else
+      echo "agent ${label} -> run ${TASK[i]}"
+    fi
     continue
   fi
 
@@ -206,7 +210,7 @@ for ((i = 0; i < N; i++)); do
   t="${TOTAL[i]}"; p="${PASSED[i]}"; f="${FAILED[i]}"
   SUM_TOTAL=$((SUM_TOTAL + t)); SUM_PASSED=$((SUM_PASSED + p)); SUM_FAILED=$((SUM_FAILED + f))
   link="\`${tid}\`"
-  [[ -n "$APP_URL" ]] && link="[view](${APP_URL}/agent-tests/run/${tid})"
+  [[ -n "$APP_URL" ]] && link="[view](${APP_URL}/tests?tab=runs&runId=${tid})"
   if [[ "$st" != "done" ]]; then
     ANY_PROBLEM=1
     ROWS+="| \`${label}\` | ${p}/${t} | ⚠️ ${st} ${link} |\n"
