@@ -59,11 +59,12 @@ Status-code conventions the script relies on: **401/403** = bad/missing key
 (connection not verified, or no linked tests). Error bodies are FastAPI-style
 `{"detail": "..."}`.
 
-A 400 is handled differently per mode: with **explicit** agents it's a failure
-(gates the build); in **all-agents** mode the agent is **skipped** — shown as
-`⏭️ skipped: <detail>` in the report, logged as a `::warning::`, and it does
-**not** gate. (You asked to sweep everything, so an agent that isn't ready to run
-shouldn't turn the build red.)
+A 400 is handled differently per mode, but the `detail` is surfaced in the report
+either way. With **explicit** agents it's a failure: shown as `❌ cannot run:
+<detail>`, logged as `::error::`, and it gates. In **all-agents** mode the agent
+is **skipped**: shown as `⏭️ skipped: <detail>`, logged as `::warning::`, and it
+does **not** gate. (You asked to sweep everything, so an agent that isn't ready to
+run shouldn't turn the build red.)
 
 ## Inputs (defined in `action.yml`)
 
@@ -87,11 +88,12 @@ shouldn't turn the build red.)
   `GET /agents` lists every agent for the key and populates `LABELS`/`AGENTS`
   directly (no resolve), and sets `LIST_MODE=1`. Both modes converge on the same
   `LABELS`/`AGENTS` arrays, so trigger/poll/report are otherwise unchanged.
-- **`LIST_MODE` softens 400s.** Only in all-agents mode, a 400 at trigger marks
-  the agent `STATUS[i]="skipped"` (reason saved in `NOTE[i]`) instead of failing —
-  the report shows `⏭️ skipped` and it doesn't set `ANY_PROBLEM`. In explicit
-  mode a 400 still gates. The aggregation loop checks `skipped` **before** the
-  empty-`tid` "not started" case (skipped agents also have no `TASK[i]`).
+- **`LIST_MODE` softens 400s.** A 400 at trigger always stashes the reason in
+  `NOTE[i]`. In all-agents mode it sets `STATUS[i]="skipped"` (report `⏭️ skipped`,
+  no `ANY_PROBLEM`); in explicit mode `STATUS[i]="unrunnable"` (report `❌ cannot
+  run`, sets `ANY_PROBLEM`, gates). The aggregation loop checks `skipped` and
+  `unrunnable` **before** the empty-`tid` "not started" case — all three have no
+  `TASK[i]`, so order matters.
 - **Fail fast on unresolved names.** In explicit mode, if any name doesn't
   resolve, the script prints each miss and exits `2` **before triggering any
   run**. Preserve this.

@@ -207,13 +207,15 @@ for ((i = 0; i < N; i++)); do
     400)
       # 400 = unrunnable agent (no tests attached, connection not verified, ...).
       # When agents were auto-discovered, skip it (don't fail the build) but keep
-      # the reason visible; with explicit agents, treat it as a failure.
+      # the reason visible; with explicit agents, treat it as a failure. Either
+      # way, stash the reason in NOTE[i] so the report explains it.
+      NOTE[i]="$(printf '%s' "$detail" | tr '\n' ' ' | sed 's/|/\\|/g')"
       if [[ "$LIST_MODE" -eq 1 ]]; then
         echo "::warning::agent ${label}: skipped (HTTP 400): ${detail}"
         STATUS[i]="skipped"
-        NOTE[i]="$(printf '%s' "$detail" | tr '\n' ' ' | sed 's/|/\\|/g')"
       else
         echo "::error::agent ${label}: cannot run (HTTP 400): ${detail}"
+        STATUS[i]="unrunnable"
       fi
       ;;
     *)
@@ -268,6 +270,12 @@ for ((i = 0; i < N; i++)); do
   if [[ "$st" == "skipped" ]]; then
     reason="${NOTE[i]}"; [[ -n "$reason" ]] && reason=": ${reason}"
     ROWS+="| \`${label}\` | — | ⏭️ skipped${reason} |\n"
+    continue
+  fi
+  if [[ "$st" == "unrunnable" ]]; then
+    reason="${NOTE[i]}"; [[ -n "$reason" ]] && reason=": ${reason}"
+    ROWS+="| \`${label}\` | — | ❌ cannot run${reason} |\n"
+    ANY_PROBLEM=1
     continue
   fi
   if [[ -z "$tid" ]]; then
