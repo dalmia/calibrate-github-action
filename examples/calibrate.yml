@@ -1,15 +1,11 @@
+# Example workflow for consumers — copy into their repo at
+# .github/workflows/calibrate.yml and adjust the agent names.
 name: Calibrate
 
 on:
   pull_request:
-    paths:
-      - "server/**"
-      - ".github/workflows/calibrate.yml"
   push:
     branches: [main]
-    paths:
-      - "server/**"
-      - ".github/workflows/calibrate.yml"
   workflow_dispatch:
 
 permissions:
