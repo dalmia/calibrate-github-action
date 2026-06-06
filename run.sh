@@ -13,7 +13,7 @@
 set -uo pipefail
 
 API_KEY="${CALIBRATE_API_KEY:?api-key input is required}"
-AGENTS_RAW="${CALIBRATE_AGENTS:?agents input is required}"
+AGENTS_RAW="${CALIBRATE_AGENTS:-}"
 BASE_URL="${CALIBRATE_BASE_URL:?base-url input is required}"
 APP_URL="${CALIBRATE_APP_URL:-}"
 MODE="${CALIBRATE_MODE:-gate}"
@@ -59,60 +59,114 @@ for t in "${_tokens[@]}"; do
   t="$(echo "$t" | xargs)"
   [[ -n "$t" ]] && LABELS+=("$t")
 done
-[[ ${#LABELS[@]} -gt 0 ]] || { echo "::error::no agents provided"; exit 2; }
 
 # Parallel arrays indexed alongside LABELS. AGENTS holds the resolved UUID used
 # for API calls; LABELS holds the agent name, used in logs and the report.
-N=${#LABELS[@]}
-AGENTS=(); TASK=(); STATUS=(); TOTAL=(); PASSED=(); FAILED=()
-for ((i = 0; i < N; i++)); do
-  AGENTS[i]=""; TASK[i]=""; STATUS[i]="not-started"; TOTAL[i]=0; PASSED[i]=0; FAILED[i]=0
-done
+AGENTS=()
 
-# Resolve agent names to UUIDs in a single batch call. Names are scoped to the
-# caller's org by the API key, so a name maps to at most one agent.
-#
-#   Resolve API:  POST /agents/resolve   {"names": ["alpha", ...]}
-#     200 -> {"resolved": {"alpha": "<uuid>", ...}, "not_found": ["missing", ...]}
-echo "::group::Resolving agents"
-names_json="$(printf '%s\n' "${LABELS[@]}" | jq -R . | jq -s '{names: .}')"
-api POST "/agents/resolve" "$names_json"
-case "$API_HTTP_STATUS" in
-  200) ;;
-  401 | 403)
-    echo "::error::authentication failed (HTTP ${API_HTTP_STATUS}) resolving agent names"
-    echo "::error::check the api-key input — set it to a valid Calibrate key via the CALIBRATE_API_KEY secret."
+# LIST_MODE=1 means agents were auto-discovered (no `agents` input). In that mode
+# an unrunnable agent (HTTP 400 at trigger — no tests, connection unverified) is
+# skipped rather than failing the build, since the user asked to sweep them all.
+LIST_MODE=0
+
+if [[ ${#LABELS[@]} -gt 0 ]]; then
+  # Explicit agents: resolve the given names to UUIDs in a single batch call.
+  # Names are scoped to the caller's org by the API key, so a name maps to at
+  # most one agent.
+  #
+  #   Resolve API:  POST /agents/resolve   {"names": ["alpha", ...]}
+  #     200 -> {"resolved": {"alpha": "<uuid>", ...}, "not_found": ["missing", ...]}
+  N=${#LABELS[@]}
+  for ((i = 0; i < N; i++)); do AGENTS[i]=""; done
+
+  echo "::group::Resolving agents"
+  names_json="$(printf '%s\n' "${LABELS[@]}" | jq -R . | jq -s '{names: .}')"
+  api POST "/agents/resolve" "$names_json"
+  case "$API_HTTP_STATUS" in
+    200) ;;
+    401 | 403)
+      echo "::error::authentication failed (HTTP ${API_HTTP_STATUS}) resolving agent names"
+      echo "::error::check the api-key input — set it to a valid Calibrate key via the CALIBRATE_API_KEY secret."
+      echo "::endgroup::"
+      exit 2
+      ;;
+    *)
+      detail="$(echo "$API_BODY" | jq -r '.detail // empty' 2>/dev/null)"
+      [[ -z "$detail" ]] && detail="$API_BODY"
+      echo "::error::failed to resolve agent names (HTTP ${API_HTTP_STATUS}): ${detail}"
+      echo "::endgroup::"
+      exit 2
+      ;;
+  esac
+
+  # Map each name to its UUID from the "resolved" object; collect any misses.
+  UNRESOLVED=()
+  for ((i = 0; i < N; i++)); do
+    AGENTS[i]="$(echo "$API_BODY" | jq -r --arg n "${LABELS[i]}" '.resolved[$n] // empty')"
+    if [[ -n "${AGENTS[i]}" ]]; then
+      echo "agent \"${LABELS[i]}\" -> ${AGENTS[i]}"
+    else
+      echo "::error::agent \"${LABELS[i]}\": no agent with that name in this org."
+      UNRESOLVED+=("${LABELS[i]}")
+    fi
+  done
+
+  # Fail fast: if any name didn't resolve, stop before triggering any runs.
+  if [[ ${#UNRESOLVED[@]} -gt 0 ]]; then
+    echo "::error::${#UNRESOLVED[@]} agent name(s) could not be resolved: ${UNRESOLVED[*]}"
     echo "::endgroup::"
     exit 2
-    ;;
-  *)
-    detail="$(echo "$API_BODY" | jq -r '.detail // empty' 2>/dev/null)"
-    [[ -z "$detail" ]] && detail="$API_BODY"
-    echo "::error::failed to resolve agent names (HTTP ${API_HTTP_STATUS}): ${detail}"
-    echo "::endgroup::"
-    exit 2
-    ;;
-esac
-
-# Map each name to its UUID from the "resolved" object; collect any misses.
-UNRESOLVED=()
-for ((i = 0; i < N; i++)); do
-  AGENTS[i]="$(echo "$API_BODY" | jq -r --arg n "${LABELS[i]}" '.resolved[$n] // empty')"
-  if [[ -n "${AGENTS[i]}" ]]; then
-    echo "agent \"${LABELS[i]}\" -> ${AGENTS[i]}"
-  else
-    echo "::error::agent \"${LABELS[i]}\": no agent with that name in this org."
-    UNRESOLVED+=("${LABELS[i]}")
   fi
-done
-
-# Fail fast: if any name didn't resolve, stop before triggering any runs.
-if [[ ${#UNRESOLVED[@]} -gt 0 ]]; then
-  echo "::error::${#UNRESOLVED[@]} agent name(s) could not be resolved: ${UNRESOLVED[*]}"
   echo "::endgroup::"
-  exit 2
+else
+  # No agents given: run every agent in the account linked to the API key. The list API
+  # returns both the name and the UUID for each, so we populate LABELS/AGENTS
+  # directly and skip the resolve step — nothing downstream changes.
+  #
+  #   List API:  GET /agents
+  #     200 -> [{"uuid": "<uuid>", "name": "alpha", ...}, ...]
+  LIST_MODE=1
+  echo "::group::Listing agents"
+  api GET "/agents"
+  case "$API_HTTP_STATUS" in
+    200) ;;
+    401 | 403)
+      echo "::error::authentication failed (HTTP ${API_HTTP_STATUS}) listing agents"
+      echo "::error::check the api-key input — set it to a valid Calibrate key via the CALIBRATE_API_KEY secret."
+      echo "::endgroup::"
+      exit 2
+      ;;
+    *)
+      detail="$(echo "$API_BODY" | jq -r '.detail // empty' 2>/dev/null)"
+      [[ -z "$detail" ]] && detail="$API_BODY"
+      echo "::error::failed to list agents (HTTP ${API_HTTP_STATUS}): ${detail}"
+      echo "::endgroup::"
+      exit 2
+      ;;
+  esac
+
+  # Take the name + UUID of every agent.
+  while IFS=$'\t' read -r _nm _id; do
+    [[ -n "$_nm" && -n "$_id" ]] || continue
+    LABELS+=("$_nm"); AGENTS+=("$_id")
+    echo "agent \"$_nm\" -> $_id"
+  done < <(echo "$API_BODY" | jq -r '.[] | [.name, .uuid] | @tsv')
+
+  if [[ ${#LABELS[@]} -eq 0 ]]; then
+    echo "::error::no agents found in the account linked to this API key — create one in Calibrate, or pass the agents input."
+    echo "::endgroup::"
+    exit 2
+  fi
+  N=${#LABELS[@]}
+  echo "::endgroup::"
 fi
-echo "::endgroup::"
+
+# Remaining parallel arrays, indexed alongside LABELS/AGENTS. NOTE carries a
+# short reason (e.g. the skip detail) shown in the report.
+TASK=(); STATUS=(); TOTAL=(); PASSED=(); FAILED=(); NOTE=()
+for ((i = 0; i < N; i++)); do
+  TASK[i]=""; STATUS[i]="not-started"; TOTAL[i]=0; PASSED[i]=0; FAILED[i]=0; NOTE[i]=""
+done
 
 # Triggering a run also validates the agent: the API returns distinct codes for
 # bad auth (401/403), missing agent (404), and unrunnable agent (400, e.g.
@@ -151,7 +205,18 @@ for ((i = 0; i < N; i++)); do
       echo "::error::agent ${label}: not found (HTTP 404) — the agent may have been deleted, or belongs to a different org than this API key."
       ;;
     400)
-      echo "::error::agent ${label}: cannot run (HTTP 400): ${detail}"
+      # 400 = unrunnable agent (no tests attached, connection not verified, ...).
+      # When agents were auto-discovered, skip it (don't fail the build) but keep
+      # the reason visible; with explicit agents, treat it as a failure. Either
+      # way, stash the reason in NOTE[i] so the report explains it.
+      NOTE[i]="$(printf '%s' "$detail" | tr '\n' ' ' | sed 's/|/\\|/g')"
+      if [[ "$LIST_MODE" -eq 1 ]]; then
+        echo "::warning::agent ${label}: skipped (HTTP 400): ${detail}"
+        STATUS[i]="skipped"
+      else
+        echo "::error::agent ${label}: cannot run (HTTP 400): ${detail}"
+        STATUS[i]="unrunnable"
+      fi
       ;;
     *)
       echo "::error::agent ${label}: failed to start (HTTP ${API_HTTP_STATUS}): ${detail}"
@@ -202,6 +267,17 @@ SUM_TOTAL=0; SUM_PASSED=0; SUM_FAILED=0; ANY_PROBLEM=0
 ROWS=""
 for ((i = 0; i < N; i++)); do
   label="${LABELS[i]}"; tid="${TASK[i]}"; st="${STATUS[i]}"
+  if [[ "$st" == "skipped" ]]; then
+    reason="${NOTE[i]}"; [[ -n "$reason" ]] && reason=": ${reason}"
+    ROWS+="| \`${label}\` | — | ⏭️ skipped${reason} |\n"
+    continue
+  fi
+  if [[ "$st" == "unrunnable" ]]; then
+    reason="${NOTE[i]}"; [[ -n "$reason" ]] && reason=": ${reason}"
+    ROWS+="| \`${label}\` | — | ❌ cannot run${reason} |\n"
+    ANY_PROBLEM=1
+    continue
+  fi
   if [[ -z "$tid" ]]; then
     ROWS+="| \`${label}\` | — | ⚠️ not started |\n"
     ANY_PROBLEM=1

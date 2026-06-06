@@ -24,7 +24,9 @@ git tag (e.g. `v1`); consumers reference it as `ARTPARK-SAHAI-ORG/calibrate-gith
   code.
 - **`README.md`** — user-facing docs. Written for a **new user** in plain
   language; keep it minimal.
-- **`examples/calibrate.yml`** — a consumer workflow to copy into their repo.
+- **`examples/specific-agents.yml`** / **`examples/all-agents.yml`** — consumer
+  workflows to copy into their repo: one naming specific agents, one omitting
+  `agents` to run every agent in the account linked to the API key.
 
 ## How a value flows through
 
@@ -43,6 +45,10 @@ defaults in **one** place — `action.yml` is the source of truth for default UR
 - `POST /agents/resolve` — body `{"names": [...]}`, returns
   `{"resolved": {name: uuid}, "not_found": [...]}`. Org-scoped by the API key;
   names are unique per org. Used to turn agent names into UUIDs.
+- `GET /agents` — no params; lists every agent in the account linked to the API key as a bare array
+  `[{"uuid": ..., "name": ..., ...}, ...]`. Used when the `agents` input is
+  omitted; both name and UUID come back so no resolve is needed. Empty org →
+  `[]`; bad key → `401`.
 - `POST /agent-tests/agent/{uuid}/run` — triggers all tests linked to the agent;
   returns `{"task_id": ...}`.
 - `GET /agent-tests/run/{task_id}` — run status; terminal states are `done`,
@@ -53,12 +59,19 @@ Status-code conventions the script relies on: **401/403** = bad/missing key
 (connection not verified, or no linked tests). Error bodies are FastAPI-style
 `{"detail": "..."}`.
 
+A 400 is handled differently per mode, but the `detail` is surfaced in the report
+either way. With **explicit** agents it's a failure: shown as `❌ cannot run:
+<detail>`, logged as `::error::`, and it gates. In **all-agents** mode the agent
+is **skipped**: shown as `⏭️ skipped: <detail>`, logged as `::warning::`, and it
+does **not** gate. (You asked to sweep everything, so an agent that isn't ready to
+run shouldn't turn the build red.)
+
 ## Inputs (defined in `action.yml`)
 
 | Input           | Required | Default                            | Notes                                                                     |
 | --------------- | -------- | ---------------------------------- | ------------------------------------------------------------------------- |
 | `api-key`       | yes      | —                                  | `sk_…`; pass via a repo secret.                                           |
-| `agents`        | yes      | —                                  | Agent **names** (not UUIDs), comma- or newline-separated.                 |
+| `agents`        | no       | _all agents_                       | Agent **names** (not UUIDs), comma- or newline-separated. Omit to run every agent in the account linked to the API key (via `GET /agents`). |
 | `base-url`      | no       | `https://pense-backend.artpark.ai` | Backend API; override only for self-hosted.                               |
 | `app-url`       | no       | `https://calibrate.artpark.ai`     | Web UI base for `view` links in the report.                               |
 | `mode`          | no       | `gate`                             | `gate` fails on any problem; `report` always exits 0.                     |
@@ -71,8 +84,19 @@ Status-code conventions the script relies on: **401/403** = bad/missing key
 - **Agents are names only.** UUID input is intentionally **not** supported — every
   token is resolved via `POST /agents/resolve`. Don't reintroduce UUID
   passthrough.
-- **Fail fast on unresolved names.** If any name doesn't resolve, the script
-  prints each miss and exits `2` **before triggering any run**. Preserve this.
+- **`agents` is optional.** Given → resolve those names (explicit mode). Omitted →
+  `GET /agents` lists every agent for the key and populates `LABELS`/`AGENTS`
+  directly (no resolve), and sets `LIST_MODE=1`. Both modes converge on the same
+  `LABELS`/`AGENTS` arrays, so trigger/poll/report are otherwise unchanged.
+- **`LIST_MODE` softens 400s.** A 400 at trigger always stashes the reason in
+  `NOTE[i]`. In all-agents mode it sets `STATUS[i]="skipped"` (report `⏭️ skipped`,
+  no `ANY_PROBLEM`); in explicit mode `STATUS[i]="unrunnable"` (report `❌ cannot
+  run`, sets `ANY_PROBLEM`, gates). The aggregation loop checks `skipped` and
+  `unrunnable` **before** the empty-`tid` "not started" case — all three have no
+  `TASK[i]`, so order matters.
+- **Fail fast on unresolved names.** In explicit mode, if any name doesn't
+  resolve, the script prints each miss and exits `2` **before triggering any
+  run**. Preserve this.
 - **`LABELS` vs `AGENTS`.** Parallel indexed arrays: `LABELS[i]` is the
   user-typed agent name (used in all logs and the report); `AGENTS[i]` is the
   resolved UUID (used in API calls). Always show `LABELS` to users, never the
@@ -102,4 +126,4 @@ syntax-checked.
 
 `README.md` targets a **new user**: short sentences, plain language, no jargon
 dumps. When changing behavior or inputs, update `README.md`, `action.yml`, and
-`examples/calibrate.yml` together so they stay consistent.
+the `examples/*.yml` workflows together so they stay consistent.
