@@ -43,9 +43,11 @@ defaults in **one** place — `action.yml` is the source of truth for default UR
 - `POST /agents/resolve` — body `{"names": [...]}`, returns
   `{"resolved": {name: uuid}, "not_found": [...]}`. Org-scoped by the API key;
   names are unique per org. Used to turn agent names into UUIDs.
-- `GET /agents` — lists every agent for the API key as
-  `[{"name": ..., "id": ...}, ...]` (or `{"agents": [...]}`). Used when the
-  `agents` input is omitted; both name and UUID come back so no resolve is needed.
+- `GET /agents` — no params; lists every agent for the API key as a bare array
+  `[{"uuid": ..., "name": ..., "type": "agent"|"connection", ...}, ...]`. Used
+  when the `agents` input is omitted; both name and UUID come back so no resolve
+  is needed. Only `type=="agent"` rows are runnable — `"connection"` rows are
+  external references and are skipped. Empty org → `[]`; bad key → `401`.
 - `POST /agent-tests/agent/{uuid}/run` — triggers all tests linked to the agent;
   returns `{"task_id": ...}`.
 - `GET /agent-tests/run/{task_id}` — run status; terminal states are `done`,
