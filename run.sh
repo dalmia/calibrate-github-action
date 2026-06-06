@@ -129,7 +129,7 @@ for ((i = 0; i < N; i++)); do
   if [[ "$API_HTTP_STATUS" == "200" || "$API_HTTP_STATUS" == "201" ]]; then
     TASK[i]="$(echo "$API_BODY" | jq -r '.task_id')"
     if [[ -n "$APP_URL" ]]; then
-      echo "agent ${label} -> ${APP_URL}/agent-tests/run/${TASK[i]}"
+      echo "agent ${label} -> ${APP_URL}/tests?tab=runs&runId=${TASK[i]}"
     else
       echo "agent ${label} -> run ${TASK[i]}"
     fi
