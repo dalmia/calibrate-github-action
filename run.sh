@@ -64,6 +64,11 @@ done
 # for API calls; LABELS holds the agent name, used in logs and the report.
 AGENTS=()
 
+# LIST_MODE=1 means agents were auto-discovered (no `agents` input). In that mode
+# an unrunnable agent (HTTP 400 at trigger — no tests, connection unverified) is
+# skipped rather than failing the build, since the user asked to sweep them all.
+LIST_MODE=0
+
 if [[ ${#LABELS[@]} -gt 0 ]]; then
   # Explicit agents: resolve the given names to UUIDs in a single batch call.
   # Names are scoped to the caller's org by the API key, so a name maps to at
@@ -120,6 +125,7 @@ else
   #
   #   List API:  GET /agents
   #     200 -> [{"uuid": "<uuid>", "name": "alpha", ...}, ...]
+  LIST_MODE=1
   echo "::group::Listing agents"
   api GET "/agents"
   case "$API_HTTP_STATUS" in
@@ -155,10 +161,11 @@ else
   echo "::endgroup::"
 fi
 
-# Remaining parallel arrays, indexed alongside LABELS/AGENTS.
-TASK=(); STATUS=(); TOTAL=(); PASSED=(); FAILED=()
+# Remaining parallel arrays, indexed alongside LABELS/AGENTS. NOTE carries a
+# short reason (e.g. the skip detail) shown in the report.
+TASK=(); STATUS=(); TOTAL=(); PASSED=(); FAILED=(); NOTE=()
 for ((i = 0; i < N; i++)); do
-  TASK[i]=""; STATUS[i]="not-started"; TOTAL[i]=0; PASSED[i]=0; FAILED[i]=0
+  TASK[i]=""; STATUS[i]="not-started"; TOTAL[i]=0; PASSED[i]=0; FAILED[i]=0; NOTE[i]=""
 done
 
 # Triggering a run also validates the agent: the API returns distinct codes for
@@ -198,7 +205,16 @@ for ((i = 0; i < N; i++)); do
       echo "::error::agent ${label}: not found (HTTP 404) — the agent may have been deleted, or belongs to a different org than this API key."
       ;;
     400)
-      echo "::error::agent ${label}: cannot run (HTTP 400): ${detail}"
+      # 400 = unrunnable agent (no tests attached, connection not verified, ...).
+      # When agents were auto-discovered, skip it (don't fail the build) but keep
+      # the reason visible; with explicit agents, treat it as a failure.
+      if [[ "$LIST_MODE" -eq 1 ]]; then
+        echo "::warning::agent ${label}: skipped (HTTP 400): ${detail}"
+        STATUS[i]="skipped"
+        NOTE[i]="$(printf '%s' "$detail" | tr '\n' ' ' | sed 's/|/\\|/g')"
+      else
+        echo "::error::agent ${label}: cannot run (HTTP 400): ${detail}"
+      fi
       ;;
     *)
       echo "::error::agent ${label}: failed to start (HTTP ${API_HTTP_STATUS}): ${detail}"
@@ -249,6 +265,11 @@ SUM_TOTAL=0; SUM_PASSED=0; SUM_FAILED=0; ANY_PROBLEM=0
 ROWS=""
 for ((i = 0; i < N; i++)); do
   label="${LABELS[i]}"; tid="${TASK[i]}"; st="${STATUS[i]}"
+  if [[ "$st" == "skipped" ]]; then
+    reason="${NOTE[i]}"; [[ -n "$reason" ]] && reason=": ${reason}"
+    ROWS+="| \`${label}\` | — | ⏭️ skipped${reason} |\n"
+    continue
+  fi
   if [[ -z "$tid" ]]; then
     ROWS+="| \`${label}\` | — | ⚠️ not started |\n"
     ANY_PROBLEM=1
