@@ -39,7 +39,7 @@ permissions:
 
 jobs:
   agent-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     steps:
       - uses: ARTPARK-SAHAI-ORG/calibrate-github-action@v1
         with:
@@ -65,15 +65,15 @@ Or omit `agents` to run every agent in the account linked to the API key:
 
 ## Inputs
 
-| Input           | Required | Default                            | Description                                                                      |
-| --------------- | -------- | ---------------------------------- | -------------------------------------------------------------------------------- |
-| `api-key`       | yes      | —                                  | `sk_…` key. Use a secret.                                                        |
+| Input           | Required | Default                            | Description                                                                                                                                    |
+| --------------- | -------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `api-key`       | yes      | —                                  | `sk_…` key. Use a secret.                                                                                                                      |
 | `agents`        | no       | _all agents_                       | Agent names, separated by commas or newlines. Runs **all** tests linked to each. Omit to run every agent in the account linked to the API key. |
-| `base-url`      | no       | `https://pense-backend.artpark.ai` | Backend API. Override only for self-hosted.                                      |
-| `app-url`       | no       | `https://calibrate.artpark.ai`     | Web UI base for `view` links in the report.                                      |
-| `mode`          | no       | `gate`                             | `gate` fails the job on any failure; `report` always succeeds.                   |
-| `poll-interval` | no       | `5`                                | Seconds between status polls.                                                    |
-| `timeout`       | no       | `1800`                             | Max seconds to wait for runs to finish.                                          |
+| `base-url`      | no       | `https://pense-backend.artpark.ai` | Backend API. Override only for self-hosted.                                                                                                    |
+| `app-url`       | no       | `https://calibrate.artpark.ai`     | Web UI base for `view` links in the report.                                                                                                    |
+| `mode`          | no       | `gate`                             | `gate` fails the job on any failure; `report` always succeeds.                                                                                 |
+| `poll-interval` | no       | `5`                                | Seconds between status polls.                                                                                                                  |
+| `timeout`       | no       | `1800`                             | Max seconds to wait for runs to finish.                                                                                                        |
 
 ## Outputs
 

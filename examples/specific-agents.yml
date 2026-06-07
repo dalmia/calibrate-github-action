@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   agent-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     steps:
       - uses: ARTPARK-SAHAI-ORG/calibrate-github-action@v1
         with:
